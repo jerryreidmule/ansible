@@ -1,0 +1,44 @@
+- hosts: localhost
+  gather_facts: no
+  vars_prompt
+  - name: target_host
+    prompt: please enter target vm
+    private:no
+  - name: ntp_server
+    prompt: please enter NTP server
+    private:no
+  tasks:
+    - add_host:
+        name: "{{ target_host }}"
+        groups: dynamically_created_hosts
+        
+- hosts: dynamically_created_hosts
+tasks:
+- name: set timezone
+shell: timedatectl set-timezone America/Chicago
+
+- name: Install NTP
+yum: name=ntp state=installed 
+tags: ntp
+
+- name: Copy over the NTP configuration
+template: src=./templates/ntp.conf.j1 dest=/etc/ntp.conf
+notify:
+- restart ntpd
+tags: ntp
+
+- name: Make sure NTP is stopped
+service: name=ntpd state=stopped enabled=yes
+tags: ntp
+
+- name: Sync time initialy
+shell: ntpdate "{{ ntp_server }}" 
+tags: ntp
+
+- name: Make sure NTP is started up
+service: name=ntpd state=running enabled=yes
+tags: ntp
+
+handlers:
+- name: restart ntpd
+service: name=ntpd state=restarted
